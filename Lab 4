@@ -1,0 +1,52 @@
+from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
+import hashlib
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
+db = SQLAlchemy(app)
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+
+@app.route('/home')
+def home():
+    return 'Welcome to the home page!'
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    
+    user = User.query.filter_by(username=username).first()
+    if user and hashlib.sha256(password.encode()).hexdigest() == user.password_hash:
+        return jsonify({'message': 'Login successful'})
+    else:
+        return jsonify({'message': 'Invalid username or password'}), 401
+
+@app.route('/signup', methods=['POST'])
+def signup():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    
+    if User.query.filter_by(username=username).first():
+        return jsonify({'message': 'Username already exists'}), 400
+    
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+    new_user = User(username=username, password_hash=password_hash)
+    db.session.add(new_user)
+    db.session.commit()
+    
+    return jsonify({'message': 'User created successfully'})
+
+@app.route('/custom', methods=['GET'])
+def custom():
+    return 'This is a custom endpoint.'
+
+if __name__ == '__main__':
+    db.create_all()
+    app.run(debug=True)
